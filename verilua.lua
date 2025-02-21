@@ -62,21 +62,22 @@ runPureStepWithRes(fmt, ...)
 end
 
 local function
-doBuildPkg(modname)
+doBuildPkg(modname, args)
 	local luaCFLAGS = runPureStepWithRes("pkg-config --cflags %s",
 					     cLuaPkgname);
 	local luaLDFLAGS = runPureStepWithRes("pkg-config --cflags %s",
 					      cLuaPkgname);
+	local extraArgs = table.concat(args, ' ');
 
 	-- Generate netlist
-	runStep('verilator --json-only %s', modname .. ".v");
+	runStep('verilator --json-only %s %s', modname .. ".v", extraArgs);
 
 	-- Generate glue
 	doGenerate(modname);
 
 	-- Compile
-	runStep('verilator --cc --build -CFLAGS "-fPIC %s" %s %s',
-		luaCFLAGS, veriluaGlueFile(modname, "cpp"), modname);
+	runStep('verilator --cc --build -CFLAGS "-fPIC %s" %s %s %s',
+		luaCFLAGS, veriluaGlueFile(modname, "cpp"), modname, extraArgs);
 
 	-- Link
 	runStep('c++ -shared %s %s/libV%s.a %s/libverilated.a ' ..
@@ -94,5 +95,11 @@ local commands = {
 		       },
 };
 
+local cmd = assert(arg[1]);
 local modname = assert(arg[2]);
-assert(commands[assert(arg[1])]).func(modname);
+local normalizedArgs = {};
+for i = 3, #arg do
+	normalizedArgs[i - 2] = arg[i];
+end
+
+assert(commands[cmd]).func(modname, normalizedArgs);
