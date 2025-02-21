@@ -107,8 +107,36 @@ module_eval(lua_State *l)
 	MODTYPE **p = (MODTYPE **)luaL_checkudata(l, 1, METANAME);
 
 	(*p)->eval();
+	Verilated::timeInc(1);
 
 	return 0;
+}
+
+static int
+module_signals(lua_State *l)
+{
+	static const char *signals[] = {
+$$
+	for _, stmt in pairs(tpl.arg.mod.stmtsp) do
+		if stmt.type ~= "VAR" then
+			goto continue;
+		end
+
+		table.insert(tpl.result, ('\t\t\t"%s",\n'):format(stmt.name));
+::continue::
+	end
+$$
+		NULL
+	};
+
+	lua_newtable(l);
+
+	for (const char **p = signals; *p; p++) {
+		lua_pushboolean(l, true);
+		lua_setfield(l, -2, *p);
+	}
+
+	return 1;
 }
 
 static const luaL_Reg module_methods[] = {
@@ -116,6 +144,7 @@ static const luaL_Reg module_methods[] = {
 	{ "set", module_set },
 	{ "get", module_get},
 	{ "eval", module_eval },
+	{ "signals", module_signals },
 	{ NULL, NULL },
 };
 
@@ -130,8 +159,18 @@ module_new(lua_State *l)
 	return 1;
 }
 
+static int
+set_trace(lua_State *l)
+{
+	Verilated::traceEverOn(lua_toboolean(l, 1));
+
+	return 0;
+}
+
 static const luaL_Reg packageMethods[] = {
 	{ "new", module_new },
+	{ "signals", module_signals },
+	{ "trace", set_trace },
 	{ NULL, NULL },
 };
 
